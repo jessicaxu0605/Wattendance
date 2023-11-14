@@ -5,9 +5,9 @@ import dotenv from 'dotenv';
 
 const app = express();
 app.use(express.json());
-const port = "3600"
+const port = 3600;
 
-const db = mysql.createPool({
+const pool = mysql.createPool({
     connectionLimit: 100,
     host: "database-1.cmxjvvdu8k9n.us-east-2.rds.amazonaws.com",
     user: "admin",
@@ -18,34 +18,30 @@ const db = mysql.createPool({
 
 //-----------------------------------------
 
+//password for testing accounts is: 39fji3jifdjf
 
-
-app.put("/find", (req,res) => {
-    const search = "SELECT * FROM users WHERE email = ?";
-    const email = req.body.email;
-    const sql_query = mysql.format(search, [email])
-
-    db.getConnection(async(err, connection)=> {
-        connection.release();
-
+function findUser(pool, query, found_func, fail_func) {
+    pool.getConnection(async(err, connection)=> {
         if(err) throw (err);
 
-        await connection.query(sql_query,
+        //search
+        await connection.query(query,
             async (err, result) => {
+                connection.release()
                 if (err) throw (err)
-                console.log("Search Results:")
-                console.log(result[0].email);
-                res.send("Search Results: "+ result[0].email);
-                found = result.length;
+
+                if (result.length > 0) {
+                    found_func(result);
+                } else {
+                    fail_func(result);
+                }
             }
         );
     });
-});
+}
 
 
-
-
-app.put("/create", async(req,res) => {
+app.put("/signup", async(req,res) => {
     const firstName = req.body.firstName;
     const lastName = req.body.lastName;
     const hashedPW = await bcrypt.hash(req.body.password, 10); //stores hashed password
@@ -54,42 +50,61 @@ app.put("/create", async(req,res) => {
     const find_query = mysql.format("SELECT * FROM users WHERE email = ?", [email]);
     const insert_query = mysql.format ("INSERT INTO users VALUES (0, ?, ?, ?, ?)", [firstName, lastName, email, hashedPW]);
 
-    db.getConnection(async(err, connection)=> {
-        if(err) throw (err);
-
-        //search for users registered under the email
-        await connection.query(find_query,
-            async (err, result) => {
-                if (err) throw (err)
-
-                //if there are no accounts registered under the email,
-                if (result.length == 0) {
-                    if(err) throw (err);
-                    
-                    //register the account
-                    await connection.query(insert_query,
-                        async (err, result) => {
-                            connection.release();
-                            if (err) throw (err)
-                            res.send("user created");
-                        }
-                    );
-
-                } 
-
-                //otherwise, don't register new account, alert client
-                else {
-                    console.log("Search Results:")
-                    console.log(result[0].firstName);
-                    res.send(email +" already has an account")
+    findUser(pool, find_query,
+        //if user found:
+        (result)=> {
+            console.log("Account already exists for email:")
+            console.log(result[0].email)
+            res.send(`There is already an account registered under ${email}`)
+        },
+        //if user not found:
+        (result) => {
+            pool.getConnection(async(err, connection)=> {
+            await connection.query(insert_query,
+                async (err, result) => {
+                    connection.release();
+                    if (err) throw (err);
+                    res.send("user created");
                 }
-            }
-        );
-    });
+            )
+            })
+        }
+    )
+});
+
+app.put("/login", async(req,res) => {
+    const email = req.body.email;
+    const password = req.body.password;
+
+    const find_query = mysql.format("SELECT * FROM users WHERE email = ?", [email]);
+    findUser(pool, find_query,
+        //if user found:
+        (result) => {
+            const hashedPW = result[0].password
+            pool.getConnection(async(err, connection) => {
+
+                const hashedPassword = result[0].password;
+                if (await bcrypt.compare(password, hashedPassword)) {
+                    console.log("Login Successful");
+                    res.send(`${email} is logged in!`);
+                } 
+                else {
+                    console.log("Password Incorrect");
+                    res.send("Password incorrect");
+                }
+            })
+        },
+        //if user not found:
+        (result) => {
+            console.log("User Does Not Exist");
+            res.send("User does not exist");
+        }
+    )
 });
 
 
+//-----------------------------------------
 
-
-
-
+app.listen (port, ()=> {
+    console.log('sdfsdfs');
+});
