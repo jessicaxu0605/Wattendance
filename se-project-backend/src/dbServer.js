@@ -2,9 +2,13 @@ import express from 'express';
 import mysql from 'mysql';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+    origin: 'http://localhost:3000',
+}));
 const port = 3600;
 
 const pool = mysql.createPool({
@@ -41,7 +45,7 @@ function findUser(pool, query, found_func, fail_func) {
 }
 
 
-app.put("/signup", async(req,res) => {
+app.post("/signup", async(req,res) => {
     const firstName = req.body.firstName;
     const lastName = req.body.lastName;
     const hashedPW = await bcrypt.hash(req.body.password, 10); //stores hashed password
@@ -72,6 +76,10 @@ app.put("/signup", async(req,res) => {
     )
 });
 
+app.put("/test", (req, res) => {
+    console.log("ok");
+})
+
 app.put("/login", async(req,res) => {
     const email = req.body.email;
     const password = req.body.password;
@@ -86,18 +94,30 @@ app.put("/login", async(req,res) => {
                 const hashedPassword = result[0].password;
                 if (await bcrypt.compare(password, hashedPassword)) {
                     console.log("Login Successful");
-                    res.send(`${email} is logged in!`);
+
+
+
+                    res.send({
+                        'status': 'successful',
+                        'user': result[0],
+                    });
                 } 
                 else {
                     console.log("Password Incorrect");
-                    res.send("Password incorrect");
+                    res.send(JSON.stringify({
+                        'status': 'unsuccessful',
+                        'error': 'passwordIncorrect'
+                    }))
                 }
             })
         },
         //if user not found:
         (result) => {
             console.log("User Does Not Exist");
-            res.send("User does not exist");
+            res.send(JSON.stringify({
+                'status': 'unsuccessful',
+                'error': 'noUser'
+            }));
         }
     )
 });
