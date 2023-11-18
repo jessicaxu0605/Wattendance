@@ -59,7 +59,10 @@ app.post("/signup", async(req,res) => {
         (result)=> {
             console.log("Account already exists for email:")
             console.log(result[0].email)
-            res.send(`There is already an account registered under ${email}`)
+            res.send({
+                'status': 'unsuccessful',
+                'erorr': 'existing user'
+            });
         },
         //if user not found:
         (result) => {
@@ -68,7 +71,17 @@ app.post("/signup", async(req,res) => {
                 async (err, result) => {
                     connection.release();
                     if (err) throw (err);
-                    res.send("user created");
+
+                    const id = result.insertId;
+                    res.send({
+                        'status': 'successful',
+                        'user': {
+                            'id': id,
+                            'firstName': firstName,
+                            'lastName': lastName,
+                            'email': email,
+                        }
+                    });
                 }
             )
             })
@@ -99,14 +112,19 @@ app.put("/login", async(req,res) => {
 
                     res.send({
                         'status': 'successful',
-                        'user': result[0],
+                        'user': {
+                            'id': result[0].idusers,
+                            'firstName': result[0].firstName,
+                            'lastName': result[0].lastName,
+                            'email': result[0].email,
+                        }
                     });
                 } 
                 else {
                     console.log("Password Incorrect");
                     res.send(JSON.stringify({
                         'status': 'unsuccessful',
-                        'error': 'passwordIncorrect'
+                        'error': 'password incorrect'
                     }))
                 }
             })
@@ -116,7 +134,15 @@ app.put("/login", async(req,res) => {
             console.log("User Does Not Exist");
             res.send(JSON.stringify({
                 'status': 'unsuccessful',
-                'error': 'noUser'
+                'error': 'no user',
+
+                //temp: DELETE LATER!!!
+                'user': {
+                    'id': '1',
+                    'firstName': 'wow',
+                    'lastName': 'wowow',
+                    'email': 'wow@sf.com',
+                }
             }));
         }
     )
