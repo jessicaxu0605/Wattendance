@@ -1,0 +1,59 @@
+app.post("/attendance-present", async(req,res) => {
+    const userID = req.body.id;
+
+    const datetime = new Date();
+    const sqlDatetime= datetime.toISOString().slice(0, 19).replace('T', ' ');
+
+    const find_present_class = mysql.format(
+        "SELECT idclasses FROM classes WHERE ? >= presentTime AND ? <= lateTime LIMIT 1", 
+        [sqlDatetime, sqlDatetime]);
+        console.log(sqlDatetime);
+    const find_late_class = mysql.format(
+        "SELECT idclasses FROM classes WHERE ? > lateTime AND ? < endTime LIMIT 1", 
+        [sqlDatetime, sqlDatetime]);
+
+    pool.getConnection(async(err, connection)=> {
+        if(err) throw (err);
+
+        try{
+            let attendanceStatus;
+            let classID = null;
+
+            const result = (await connection.query(find_present_class))._results;
+            const test = (await connection.query(mysql.format("SELECT * FROM users")))._results;
+            console.log (test);
+            if (result.length > 0) {
+                classID = result[0].idclasses;
+                attendanceStatus = 0;
+            } else {
+                const lateResult = await connection.query(find_late_class);
+                if (lateResult.length > 0) {
+                    classID = lateResult[0].idclasses;
+                    attendanceStatus = 1;
+                } else {
+                    console.log("no classes");
+                    console.log(sqlDatetime);
+                }
+            }
+            if (classID != null) {
+                const insert_query = mysql.format(
+                    "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, ?, ?)", 
+                    [classID, userID, attendanceStatus, sqlDatetime]);
+                await connection.query(insert_query);
+                res.send("haha");
+            } else {
+                res.send("no classes found");
+            }
+        } catch (err) {
+            throw (err);
+        } finally {
+            connection.release();
+        }
+    });
+})
+
+
+
+app.listen (port, ()=> {
+    console.log('sdfsdfs');
+});
