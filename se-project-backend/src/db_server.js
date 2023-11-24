@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(cors({
     origin: 'http://localhost:3000',
 }));
-const port = 80;
+const port = 3600;
 
 const pool = mysql.createPool({
     connectionLimit: 100,
