@@ -13,7 +13,7 @@ app.use(cors({
 const port = 3600;
 
 const pool = mysql.createPool({
-    connectionLimit: 100,
+    connectionLimit: 10,
     host: "database-1.cmxjvvdu8k9n.us-east-2.rds.amazonaws.com",
     user: "admin",
     password: "teamcircus",
@@ -151,11 +151,23 @@ app.post("/attendance-present", async(req,res) => {
     const sqlDatetime= datetime.toISOString().slice(0, 19).replace('T', ' ');
 
     const find_present_class = mysql.format(
-        "SELECT idclasses FROM classes WHERE TIMESTAMPDIFF(15 MINUTE, '?', startTime) LIMIT 1", 
+        "SELECT cl.idclasses \
+        FROM users u \
+        JOIN `courses-users` cu ON cu.userID = u.idusers \
+        JOIN classes cl ON cl.courseID = cu.courseID \
+        WHERE TIMESTAMPDIFF(MINUTE, ?, cl.startTime) BETWEEN -1 AND 15 \
+        LIMIT 1;",
+        //"SELECT idclasses FROM classes WHERE TIMESTAMPDIFF(MINUTE, ?, startTime) BETWEEN -1 AND 15 LIMIT 1;",
         [sqlDatetime]);
         console.log(sqlDatetime);
     const find_late_class = mysql.format(
-        "SELECT idclasses FROM classes WHERE ? > startTime AND ? < endTime LIMIT 1", 
+        "SELECT cl.idclasses \
+        FROM users u \
+        JOIN `courses-users` cu ON cu.userID = u.idusers \
+        JOIN classes cl ON cl.courseID = cu.courseID \
+        WHERE '2023-11-25 03:03:11' > cl.startTime AND '2023-11-25 03:03:11' < cl.endTime \
+        LIMIT 1;",
+        //"SELECT idclasses FROM classes WHERE ? > startTime AND ? < endTime LIMIT 1", 
         [sqlDatetime, sqlDatetime]);
 
     pool.getConnection(async(err, connection)=> {
@@ -164,22 +176,28 @@ app.post("/attendance-present", async(req,res) => {
         try{
             await connection.query(find_present_class,
             async(err, result)=> {
+                console.log(result);
                 if (result.length > 0) {
                     const classID = result[0].idclasses;
                     const insert_query = mysql.format(
                         "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, 0, ?)", 
                         [classID, userID, sqlDatetime]);
                     await connection.query(insert_query);
+                    console.log(insert_query);
+                    console.log(find_present_class);
                     console.log("present");
                 } else {
                     await connection.query(find_late_class,
                         async(err, lateResult)=> {
                             if (lateResult.length > 0) {
                                 const classID = lateResult[0].idclasses;
+                                console.log(lateResult[0]);
                                 const insert_query = mysql.format(
                                     "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, 1, ?)", 
                                     [classID, userID, sqlDatetime]);
                                 await connection.query(insert_query);
+                                console.log(find_late_class);
+                                console.log(insert_query);
                                 console.log("late");
                             } else {
                                 console.log("no classes");
@@ -198,32 +216,58 @@ app.post("/attendance-present", async(req,res) => {
 })
 
 app.post("/attendance-absent", async(req,res) => {
-    const userIDs = req.body.users;
+    const classID = req.body.class;
+    
+    function get(query) {
+        return new Promise((resolve, reject) => {
+            pool.getConnection((err, connection) => {
+                if (err) {
+                    connection.release();
+                    reject(err);
+                } else {
+                    connection.query(query, (err, result) => {
+                        connection.release();
+                        if (err) {
+                            reject(err);
+                        } else {
+                            console.log("\n\n");
+                            console.log(result);
+                            resolve(result);
+                        }
+                    });
+                }
+            });
+        });
+    }
 
-    const datetime = new Date();
-    const sqlDatetime= datetime.toISOString().slice(0, 19).replace('T', ' ');
+    const find_courseID = mysql.format("SELECT courseID FROM classes WHERE idclasses = ? LIMIT 1", [classID]);
+    
 
-    const find_class = mysql.format("SELECT idclasses WHERE ABS(TIMESTAMPDIFF(MINUTE, endTime, '?'))", [sqlDatetime]);
 
-    pool.getConnection(async(err, connection)=>{
-        if(err) throw (err);
-
-        try{
-            for (let userID in userIDs) {
+    try {
+        const courses = await get(find_courseID);
+        const courseID = courses[0].courseID;
+        console.log(courseID);
+        const find_absent = mysql.format(
+            "SELECT userID FROM `courses-users` WHERE courseID = ?\
+            AND userID NOT IN (SELECT userID FROM attendance WHERE classID = ?)",
+            [courseID, classID]);
+        console.log(find_absent);
+        const absent = await get(find_absent);
+        pool.getConnection(async(err, connection)=>{
+            for (let user in absent) {
+                const userID = absent[user].userID;
+                console.log(userID);
                 const insert_query = mysql.format(
-                    "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, 2, ?)", 
-                    [classID, userID, sqlDatetime]);
+                    "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, 2, NULL)", 
+                    [classID, userID]);
                 await connection.query(insert_query);
-                console.log("absent");
             }
-            res.send("ffff");
-        } catch (err) {
-            throw (err);
-        } finally {
-            connection.release();
-        }
-
-    })
+        })
+    } catch (err) {
+        throw (err);
+    }
+    
 
 });
 
