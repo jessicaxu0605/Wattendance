@@ -286,7 +286,7 @@ app.put("/get-attendance-batched", async(req,res) => {
     console.log(req.body);
     const find_attendance = mysql.format(
         "SELECT DATE(datetime) AS `date`, classID FROM attendance\
-         WHERE `datetime` IS NOT NULL AND userID = ?\
+         WHERE `datetime` IS NOT NULL AND userID = ? AND NOT attendanceStatus = 3\
          ORDER BY `date`",
         [userID]
     );
@@ -386,7 +386,6 @@ app.put("/get-scatter-points", async(req,res) => {
                 let i = 1;
                 while (i < result.length) {
                     if (result[i].userID != curUser) {
-                        console.log(j);
                         attendance.push({
                             'y':result[i].average,
                             'x': count,
@@ -509,7 +508,7 @@ app.put("/get-user-course-attendance", async(req,res) => {
         const get_course_attendance = mysql.format(
             "SELECT c.courseID FROM attendance a\
             JOIN classes c ON c.idclasses = a.classID\
-            WHERE c.courseID = ? AND a.userID = ?",
+            WHERE c.courseID = ? AND a.userID = ? AND NOT a.attendanceStatus = 3",
             [courseID, userID]
         );
         pool.getConnection(async(err, connection) => {
