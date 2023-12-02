@@ -181,11 +181,11 @@ app.post("/attendance-present", async(req,res) => {
                         [classID, userID, sqlDatetime]);
                     await connection.query(insert_query);
                     const courseID = result[0].courseID;
-                                const update_course = mysql.format(
-                                    "UPDATE courses SET totalAttendance = totalAttendance + 1 WHERE idcourses = ?",
-                                    [courseID]
-                                )
-                                await connection.query(update_course);
+                    const update_course = mysql.format(
+                        "UPDATE courses SET totalAttendance = totalAttendance + 1 WHERE idcourses = ?",
+                        [courseID]
+                    )
+                    await connection.query(update_course);
                     console.log(insert_query);
                     console.log(find_present_class);
                     console.log("present");
@@ -200,6 +200,7 @@ app.post("/attendance-present", async(req,res) => {
                                     "INSERT INTO attendance (`classID`, `userID`, `attendanceStatus`, `datetime`) VALUES (?, ?, 1, ?)", 
                                     [classID, userID, sqlDatetime]);
                                 await connection.query(insert_query);
+                                console.log(insert_query);
                                 const courseID = lateResult[0].courseID;
                                 const update_course = mysql.format(
                                     "UPDATE courses SET totalAttendance = totalAttendance + 1 WHERE idcourses = ?",
