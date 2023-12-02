@@ -8,7 +8,7 @@ import cron from 'node-cron';
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: '*',
 }));
 const port = 3600;
 dotenv.config();
@@ -218,6 +218,7 @@ app.post("/attendance-present", async(req,res) => {
         } catch (err) {
             throw (err);
         } finally {
+            res.send("ok");
             connection.release();
         }
     });
