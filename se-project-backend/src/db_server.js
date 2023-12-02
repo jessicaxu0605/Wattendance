@@ -286,7 +286,7 @@ app.put("/get-attendance-batched", async(req,res) => {
     console.log(req.body);
     const find_attendance = mysql.format(
         "SELECT DATE(datetime) AS `date`, classID FROM attendance\
-         WHERE `datetime` IS NOT NULL AND userID = ? AND NOT attendanceStatus = 3\
+         WHERE userID = ? AND NOT attendanceStatus = 3\
          ORDER BY `date`",
         [userID]
     );
@@ -417,61 +417,6 @@ app.put("/get-scatter-points", async(req,res) => {
     
 })
 
-// app.put("/get-course-attendance", async(req,res) => {
-//     const courseID = req.body.courseID;
-
-//     const get_course_info = mysql.format(
-//         "SELECT courseName, courseCode FROM courses\
-//         WHERE idcourses = ? LIMIT 1",
-//         [courseID]
-//     );
-//     function getCourseInfo() {
-//         return new Promise((resolve, reject) => {
-//             pool.getConnection((err, connection) => {
-//                 if (err) {
-//                     connection.release();
-//                     reject(err);
-//                 } else {
-//                     connection.query(get_course_info, (err, result) => {
-//                         connection.release();
-//                         if (err) {
-//                             reject(err);
-//                         } else {
-//                             resolve(result);
-//                         }
-//                     });
-//                 }
-//             });
-//         });
-//     }
-//     try{
-//         const course_info = await getCourseInfo();
-
-//         const get_course_attendance = mysql.format(
-//             "SELECT c.courseID FROM attendance a\
-//             JOIN classes c ON c.idclasses = a.classID\
-//             WHERE c.courseID = ?",
-//             [courseID]
-//         );
-//         pool.getConnection(async(err, connection) => {
-//             connection.release();
-
-//             await connection.query(get_course_attendance,
-//                 async(err, result)=> {
-//                     const length = result.length;
-//                     const { courseName, courseCode } = course_info[0];
-//                     res.send({
-//                         'course': courseName,
-//                         'code': courseCode,
-//                         'attendance': length,
-//                     })
-//                 });
-//         });
-//     } catch (err) {
-//         throw (err);
-//     }
-    
-// })
 
 
 app.put("/get-user-course-attendance", async(req,res) => {
@@ -597,26 +542,6 @@ app.post("/set-survey-result", async(req,res) => {
     });
 });
 
-// app.put("/get-user-survey-result", async(req,res) => {
-//     const userID = req.body.userID;
-
-//     const insert_query = mysql.format ("SELECT q1, q2, q3, q4 FROM `survey-results` \
-//     WHERE userID = ? LIMIT 1", 
-//     [userID]);
-
-//     pool.getConnection(async(err, connection)=> {
-//     await connection.query(insert_query, 
-//         async(err, result)=> {
-        
-//         res.send({
-//             'q1': result[0].q1,
-//             'q2': result[0].q2,
-//             'q3': result[0].q3,
-//             'q4': result[0].q4,
-//         })
-//     });
-//     });
-// });
 
 //scheduled calls for recording absences:
 const absence = async(classID, time)=> {
@@ -637,6 +562,38 @@ const absence = async(classID, time)=> {
         }
     });
 }
+
+
+
+app.get("/artificial-attendance", async(req,res) => {
+
+
+    pool.getConnection(async(err, connection)=> {
+        for (let i = 5; i < (200); i++) {
+            
+            const rand = Math.floor(Math.random() * 101);
+            let status;
+            if (rand <25) {
+                status = 3;
+            } else if (rand <50) {
+                status = 2;
+            } else {
+                status = 1;
+            }
+
+            const user = 18;
+            const insert_query = mysql.format(
+                "INSERT INTO `se_site`.`attendance` (`attendanceStatus`, `classID`, `userID`) VALUES (?, ?, ?)",
+                [status, i, user]
+            )
+            await connection.query(insert_query);
+
+        }
+
+    });
+});
+
+
 
 
 // Not including tutorials or labs
