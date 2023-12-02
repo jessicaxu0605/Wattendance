@@ -301,22 +301,23 @@ app.put("/get-attendance-batched", async(req,res) => {
                     res.send(attendance);
                 } else {
                     console.log(result[0]);
-                    let curDate = result[0].date;
+                    let curDate = result[0].date.getTime();
                     let count = 1;
                     let i = 1;
                     while (i < result.length) {
 
-                        if (result[i].date != curDate) {
+                        if (result[i].date.getTime() != curDate) {
                             attendance.push({'date': curDate, 'count': count})
-                            curDate = result[i].date;
+                            curDate = result[i].date.getTime();
+                            console.log(count);
                             count = 0;
                         }
                         count++;
                         i++;
-                        console.log(curDate);
                     }
                     attendance.push({'date': curDate, 'count': count});
                     console.log(attendance);
+                    console.log(attendance.length);
                     res.send(attendance)
                 }
             });
@@ -366,9 +367,10 @@ app.put("/get-scatter-points", async(req,res) => {
         FROM `courses-users` cu\
         LEFT JOIN `survey-results` sr ON sr.userID = cu.userID\
         LEFT JOIN attendance a ON a.userID = cu.userID\
-        WHERE cu.courseID = ? AND sr.courseID = ? AND NOT a.attendanceStatus =3\
+        JOIN classes c ON c.idclasses = a.classID\
+        WHERE cu.courseID = ? AND sr.courseID = ? AND c.courseID = ? AND NOT a.attendanceStatus =3\
         ORDER BY cu.userID",
-        [courseID, courseID]
+        [courseID, courseID, courseID]
     );
     
     console.log(get_all_attendance);
@@ -569,6 +571,7 @@ app.get("/artificial-attendance", async(req,res) => {
 
 
     pool.getConnection(async(err, connection)=> {
+        connection.release();
         for (let i = 5; i < (200); i++) {
             
             const rand = Math.floor(Math.random() * 101);
@@ -581,18 +584,64 @@ app.get("/artificial-attendance", async(req,res) => {
                 status = 1;
             }
 
-            const user = 18;
-            const insert_query = mysql.format(
-                "INSERT INTO `se_site`.`attendance` (`attendanceStatus`, `classID`, `userID`) VALUES (?, ?, ?)",
-                [status, i, user]
+            const user = 19;
+            const get_date = mysql.format(
+                "SELECT startTime FROM classes WHERE idclasses = ? LIMIT 1",
+                [i]
             )
-            await connection.query(insert_query);
-
+            
+            await connection.query(get_date, async(err, result) => {
+                const date = result[0].startTime;
+                const insert_query = mysql.format(
+                    "INSERT INTO `se_site`.`attendance` (`attendanceStatus`, `classID`, `userID`, `dateTime`) VALUES (?, ?, ?, ?)",
+                    [status, i, user, date]
+                )
+                pool.getConnection(async(err, connection)=> {
+                    connection.release();
+                    console.log(insert_query);
+                    await connection.query(insert_query);
+                })
+            });
+            
         }
 
     });
 });
 
+app.get("/artificial-classes", async(req,res) => {
+
+    pool.getConnection(async(err, connection)=> {
+
+        const now = new Date();
+        const end = new Date();
+        const result = [];
+
+        now.setDate(now.getDate() - now.getDay() + 2+7);
+        end.setDate(now.getDate() - now.getDay() + 2+7);
+
+        //UPDATE:
+        const userID=5;
+        const start = 5;
+
+        for (let i = 5; i < (200); i++) {
+
+            //UPDATE
+            now.setHours(13, 30, 0, 0);
+            end.setHours(14, 20, 0, 0);
+
+
+            const add_class_query = mysql.format(
+                "INSERT INTO `se_site`.`classes` (idclasses, courseID, `startTime`, endTime) VALUES (?,?,?,?);",
+                [i, courseID, now, end]
+            )
+            await connection.query(add_class_query);
+
+            
+            now.setDate(now.getDate() - 7);
+        }
+
+    });
+});
 
 
 
